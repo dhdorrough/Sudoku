@@ -92,6 +92,12 @@ type
     function Impossible: boolean;
   end;
 
+  THistRec = record
+    LastCol: byte;
+    LastRow: byte;
+    LastVal: byte;
+  end;
+
   TfrmSudoko = class(TForm)
     lblStatus: TLabel;
     OvcTable1: TOvcTable;
@@ -119,6 +125,7 @@ type
     Green1PossibleNUmber1: TMenuItem;
     Yellow2PossibleNumbers1: TMenuItem;
     Fuschiamorethan2possiblenumbers1: TMenuItem;
+    Undo2: TMenuItem;
     procedure StringGrid1SetEditText(Sender: TObject; ACol, ARow: Integer;
       const cValue: String);
     procedure FormCreate(Sender: TObject);
@@ -144,14 +151,21 @@ type
     procedure actSaveAsExecute(Sender: TObject);
     procedure actSolveItExecute(Sender: TObject);
     procedure OvcTable1PaintUnusedArea(Sender: TObject);
+    procedure OvcTable1MouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
+    procedure Undo2Click(Sender: TObject);
   private
     fGrid: TGrid;
+    fIsSolved: boolean;
     fSaveFileName: string;
     fCellData: string[255];
+    fHistory: array of THistRec;
+
     function IsAPossibleValue(aValue: integer; Col, Row: TRowColNum;
                               var ErrMsg: string): boolean;
     function GetGrid: TGrid;
     procedure ClearData;
+    procedure AddHist(Hist: THistRec);
     { Private declarations }
   public
     { Public declarations }
@@ -482,7 +496,10 @@ constructor TfrmSudoko.Create(aOwner: TComponent);
 begin
   inherited;
   if Grid.LoadData(SaveFileName) then
-    OvcTable1.Invalidate
+    begin
+      fIsSolved := false;
+      OvcTable1.Invalidate
+    end;
 end;
 
 procedure TfrmSudoko.FormCloseQuery(Sender: TObject;
@@ -508,6 +525,7 @@ end;
 
 procedure TfrmSudoko.btnClearClick(Sender: TObject);
 begin
+  fIsSolved := false;
   ClearData;
 end;
 
@@ -516,6 +534,8 @@ procedure TfrmSudoko.OvcTable1GetCellAttributes(Sender: TObject; RowNum,
 var
   BitCount: byte;
 begin
+  if fIsSolved then
+    CellAttr.caColor := clAqua else
   if Grid.Data[ColNum+1, RowNum+1].Value > 0 then
     CellAttr.caColor := clWhite
   else
@@ -564,16 +584,19 @@ var
   Temp: string;
   TblRegion: TOvcTblRegion;
 begin
-  TblRegion := OvcTable1.CalcRowColFromXY(X, Y, aRowNum, aColNum);
-  if TblRegion = otrInMain then
+  if not fIsSolved then
     begin
-      PossibleValues := Grid.Data[aColNum+1, aRowNum+1].PossibleValues;
+      TblRegion := OvcTable1.CalcRowColFromXY(X, Y, aRowNum, aColNum);
+      if TblRegion = otrInMain then
+        begin
+          PossibleValues := Grid.Data[aColNum+1, aRowNum+1].PossibleValues;
 
-      Temp := '';
-      for Val := MINVAL to MAXVAL do
-        if Val in PossibleValues then
-          Temp := Temp + ' ' + IntToStr(Val);
-      lblStatus.Caption := Temp;
+          Temp := '';
+          for Val := MINVAL to MAXVAL do
+            if Val in PossibleValues then
+              Temp := Temp + ' ' + IntToStr(Val);
+          lblStatus.Caption := Temp;
+        end;
     end;
 end;
 
@@ -582,14 +605,27 @@ procedure TfrmSudoko.OvcTable1DoneEdit(Sender: TObject; RowNum, ColNum: Integer)
     Temp: string;
     aCol, aRow: integer;
     Value: integer;
+    ErrMsg: string;
 begin
-  aCol  := ColNum+1;
-  aRow  := RowNum+1;
-  Temp  := fCellData;
+  aCol     := ColNum+1;
+  aRow     := RowNum+1;
+
+  Temp     := fCellData;
   if Temp <> '' then
     try
       Value := StrToInt(Temp);
-      Grid.Data[aCol, aRow].Value := Value;
+      if IsAPossibleValue(Value, aCol, aRow, ErrMsg) then
+        begin
+          Grid.Data[aCol, aRow].Value := Value;
+          fIsSolved := Grid.Solved;
+          if fIsSolved then
+            begin
+              lblStatus.Caption := 'SOLVED!';
+              lblStatus.Color   := clLime;
+            end;
+        end
+      else
+        Error(ErrMsg);
       OvcTable1.Invalidate;
     except
       // if we can't convert it, ignore it.
@@ -644,6 +680,7 @@ end;
 
 procedure TfrmSudoko.actClearExecute(Sender: TObject);
 begin
+  fIsSolved := false;
   ClearData;
 end;
 
@@ -678,6 +715,7 @@ end;
 
 procedure TfrmSudoko.ClearData;
 begin
+  fIsSolved := false;
   Grid.ClearData;
   OvcTable1.Invalidate;
 end;
@@ -895,6 +933,56 @@ begin
 
       Canvas.MoveTo(0, y2);
       Canvas.LineTo(ClientWidth, y2);
+    end;
+end;
+
+procedure TfrmSudoko.AddHist(Hist: THistRec);
+var
+  Len: integer;
+begin
+  Len := Length(fHistory);
+  SetLength(fHistory, Len+1);
+  with fHistory[Len] do
+    begin
+      LastCol := Hist.LastCol;
+      LastRow := Hist.LastRow;
+      LastVal := Hist.LastVal;
+    end;
+end;
+
+
+procedure TfrmSudoko.OvcTable1MouseDown(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+var
+  TblRegion: TOvcTblRegion;
+  Hist: THistRec;
+  iLastRow, iLastCol: integer;
+begin
+  with Hist do
+    begin
+      TblRegion  := OvcTable1.CalcRowColFromXY(X, Y, iLastRow, iLastCol);
+      if TblRegion = otrInMain then
+        begin
+          LastRow    := iLastRow;
+          LastCol    := iLastCol;
+          LastVal    := Grid.Data[LastCol+1, LastRow+1].Value;
+          AddHist(Hist);
+        end;
+    end;
+end;
+
+
+procedure TfrmSudoko.Undo2Click(Sender: TObject);
+var
+  Len: integer;
+begin
+  Len := Length(fHistory);
+  if Len > 0 then
+    begin
+      with fHistory[Len-1] do
+        Grid.Data[LastCol+1, LastRow+1].Value := LastVal;
+      SetLength(fHistory, Len-1);
+      OvcTable1.Invalidate;
     end;
 end;
 

@@ -2,7 +2,7 @@ object frmSudoko: TfrmSudoko
   Left = 1398
   Top = 183
   BorderStyle = bsSingle
-  Caption = 'Sudoku'
+  Caption = 'Sudoku Assistant'
   ClientHeight = 333
   ClientWidth = 352
   Color = clBtnFace
@@ -28,6 +28,8 @@ object frmSudoko: TfrmSudoko
     Height = 13
     Anchors = [akLeft, akBottom]
     Caption = 'lblStatus'
+    Color = clBtnFace
+    ParentColor = False
   end
   object OvcTable1: TOvcTable
     Left = 16
@@ -61,6 +63,7 @@ object frmSudoko: TfrmSudoko
     OnDoneEdit = OvcTable1DoneEdit
     OnGetCellData = OvcTable1GetCellData
     OnGetCellAttributes = OvcTable1GetCellAttributes
+    OnMouseDown = OvcTable1MouseDown
     OnMouseMove = OvcTable1MouseMove
     OnPaintUnusedArea = OvcTable1PaintUnusedArea
     CellData = (
@@ -154,6 +157,14 @@ object frmSudoko: TfrmSudoko
       end
       object Exit1: TMenuItem
         Action = actExit
+      end
+    end
+    object Undo1: TMenuItem
+      Caption = 'Edit'
+      object Undo2: TMenuItem
+        Caption = 'Undo'
+        ShortCut = 16474
+        OnClick = Undo2Click
       end
     end
     object Help1: TMenuItem
