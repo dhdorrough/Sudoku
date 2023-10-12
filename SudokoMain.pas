@@ -1,3 +1,4 @@
+{$Define debugging}
 unit SudokoMain;
 
 interface
@@ -93,8 +94,8 @@ type
   end;
 
   THistRec = record
-    LastCol: byte;
-    LastRow: byte;
+    LastCol: TColNum;
+    LastRow: TRowNum;
     LastVal: byte;
   end;
 
@@ -126,6 +127,9 @@ type
     Yellow2PossibleNumbers1: TMenuItem;
     Fuschiamorethan2possiblenumbers1: TMenuItem;
     Undo2: TMenuItem;
+    lblStatus1: TLabel;
+    lblStatus2: TLabel;
+    Edit1: TMenuItem;
     procedure StringGrid1SetEditText(Sender: TObject; ACol, ARow: Integer;
       const cValue: String);
     procedure FormCreate(Sender: TObject);
@@ -154,6 +158,7 @@ type
     procedure OvcTable1MouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
     procedure Undo2Click(Sender: TObject);
+    procedure Edit1Click(Sender: TObject);
   private
     fGrid: TGrid;
     fIsSolved: boolean;
@@ -495,6 +500,10 @@ end;
 constructor TfrmSudoko.Create(aOwner: TComponent);
 begin
   inherited;
+{$IfNDef debugging}
+  lblStatus1.Visible := false;
+  lblStatus2.Visible := false;
+{$EndIf debugging}
   if Grid.LoadData(SaveFileName) then
     begin
       fIsSolved := false;
@@ -506,7 +515,9 @@ procedure TfrmSudoko.FormCloseQuery(Sender: TObject;
   var CanClose: Boolean);
 begin
   if Grid.Changed then
+{$IfNDef debugging}
     if Yes('Save current data? ') then
+{$EndIf}
       Grid.SaveData(SaveFileName);
   CanClose := true;
 end;
@@ -554,26 +565,39 @@ end;
 procedure TfrmSudoko.OvcTable1GetCellData(Sender: TObject; RowNum,
   ColNum: Integer; var Data: Pointer; Purpose: TOvcCellDataPurpose);
 var
-  aRow, aCol: integer;
+  aRow, aCol, Value: integer;
+//      Note: Grid.Data[] is 1..9
+//            OvcTable1.Active is 0..8
 begin
   aRow := RowNum + 1;
   aCol := ColNum + 1;
   case Purpose of
     cdpForPaint,
-    cdpForEdit,
     cdpForSave:
-      if Grid.Data[aCol, aRow].Value <> 0 then
-        begin
-          fCellData := IntToStr(Grid.Data[aCol, aRow].Value);
-          Data      := @fCellData;
-        end
-      else
-        begin
+      begin
+        Value := Grid.Data[aCol, aRow].Value;
+        if Value <> 0 then
+          fCellData := IntToStr(Value)
+        else
           fCellData := '';
-          Data      := @fCellData;
+
+        Data := @fCellData;
+      end;
+
+    cdpForEdit:
+      with OvcTable1 do
+        begin
+          Value := Grid.Data[ActiveCol+1, ActiveRow+1].Value;
+          if Value <> 0 then
+            fCellData := IntToStr(Value)
+          else
+            fCellData := '';
+
+          Data := @fCellData;
         end;
   end;
 end;
+
 
 procedure TfrmSudoko.OvcTable1MouseMove(Sender: TObject;
   Shift: TShiftState; X, Y: Integer);
@@ -583,22 +607,45 @@ var
   Val: TRowColNum;
   Temp: string;
   TblRegion: TOvcTblRegion;
+//      Note: Grid.Data[] is 1..9
+//            OvcTable1.Active is 0..8
 begin
-  if not fIsSolved then
+  with OvcTable1 do
     begin
       TblRegion := OvcTable1.CalcRowColFromXY(X, Y, aRowNum, aColNum);
-      if TblRegion = otrInMain then
+      if TblRegion = otrInMain then             // in the grid
         begin
-          PossibleValues := Grid.Data[aColNum+1, aRowNum+1].PossibleValues;
+          if (aRowNum = 0) and (aColNum = 0) and
+             (ActiveRow <> 0) and (ActiveCol <> 0) then // this MAY be the active cell
+            begin                                 // meaning that aRowNum, aColNum were (probably) wrong
+              aRowNum := ActiveRow;
+              aColNum := ActiveCol;
+            end;
 
+          PossibleValues := Grid.Data[aColNum+1, aRowNum+1].PossibleValues;
+          
           Temp := '';
           for Val := MINVAL to MAXVAL do
             if Val in PossibleValues then
               Temp := Temp + ' ' + IntToStr(Val);
-          lblStatus.Caption := Temp;
-        end;
+        end
+      else
+        Temp := '';
+
+      lblStatus.Caption := Temp;
     end;
+
+{$IfDef debugging}
+  with OvcTable1 do
+    begin
+      lblStatus1.Caption := Format('aRowNum = %d, aColNum = %d', [aRowNum,   aColNum]);
+      lblStatus2.Caption := Format('AcRow   = %d, AcCol   = %d', [ActiveRow, ActiveCol]);
+    end;
+{$EndIf debugging}
+
 end;
+
+
 
 procedure TfrmSudoko.OvcTable1DoneEdit(Sender: TObject; RowNum, ColNum: Integer);
   var
@@ -625,7 +672,10 @@ begin
             end;
         end
       else
-        Error(ErrMsg);
+        begin
+          Grid.Data[aCol, aRow].Value := 0;
+          Error(ErrMsg);
+        end;
       OvcTable1.Invalidate;
     except
       // if we can't convert it, ignore it.
@@ -956,15 +1006,12 @@ procedure TfrmSudoko.OvcTable1MouseDown(Sender: TObject;
 var
   TblRegion: TOvcTblRegion;
   Hist: THistRec;
-  iLastRow, iLastCol: integer;
 begin
   with Hist do
     begin
-      TblRegion  := OvcTable1.CalcRowColFromXY(X, Y, iLastRow, iLastCol);
+      TblRegion  := OvcTable1.CalcRowColFromXY(X, Y, LastRow, LastCol);
       if TblRegion = otrInMain then
         begin
-          LastRow    := iLastRow;
-          LastCol    := iLastCol;
           LastVal    := Grid.Data[LastCol+1, LastRow+1].Value;
           AddHist(Hist);
         end;
@@ -984,6 +1031,14 @@ begin
       SetLength(fHistory, Len-1);
       OvcTable1.Invalidate;
     end;
+end;
+
+procedure TfrmSudoko.Edit1Click(Sender: TObject);
+var
+  Len: integer;
+begin
+  Len := Length(fHistory);
+  Undo2.Enabled := Len > 0;
 end;
 
 end.

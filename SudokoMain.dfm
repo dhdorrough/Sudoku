@@ -31,6 +31,40 @@ object frmSudoko: TfrmSudoko
     Color = clBtnFace
     ParentColor = False
   end
+  object lblStatus1: TLabel
+    Left = 266
+    Top = 297
+    Width = 70
+    Height = 14
+    Alignment = taRightJustify
+    Anchors = [akLeft, akTop, akRight, akBottom]
+    BiDiMode = bdLeftToRight
+    Caption = 'lblStatus1'
+    Font.Charset = ANSI_CHARSET
+    Font.Color = clWindowText
+    Font.Height = -11
+    Font.Name = 'Courier New'
+    Font.Style = []
+    ParentBiDiMode = False
+    ParentFont = False
+  end
+  object lblStatus2: TLabel
+    Left = 267
+    Top = 311
+    Width = 70
+    Height = 14
+    Alignment = taRightJustify
+    Anchors = [akLeft, akTop, akRight, akBottom]
+    BiDiMode = bdLeftToRight
+    Caption = 'lblStatus2'
+    Font.Charset = ANSI_CHARSET
+    Font.Color = clWindowText
+    Font.Height = -11
+    Font.Name = 'Courier New'
+    Font.Style = []
+    ParentBiDiMode = False
+    ParentFont = False
+  end
   object OvcTable1: TOvcTable
     Left = 16
     Top = 16
@@ -159,8 +193,9 @@ object frmSudoko: TfrmSudoko
         Action = actExit
       end
     end
-    object Undo1: TMenuItem
+    object Edit1: TMenuItem
       Caption = 'Edit'
+      OnClick = Edit1Click
       object Undo2: TMenuItem
         Caption = 'Undo'
         ShortCut = 16474

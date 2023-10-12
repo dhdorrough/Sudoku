@@ -59,6 +59,7 @@
 *.tvsconfig
 *.dsk
 junk.*
+~*.docx
 
 # Delphi history and backups
 __history/
