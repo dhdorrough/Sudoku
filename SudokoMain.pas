@@ -1,3 +1,5 @@
+// Delphi 7.0 (Build 8.1)
+// Orpheus Version 4.06 Release 1.11 (https://sourceforge.net/projects/tporpheus/)
 {$Define debugging}
 unit SudokoMain;
 
@@ -613,6 +615,8 @@ begin
   with OvcTable1 do
     begin
       TblRegion := OvcTable1.CalcRowColFromXY(X, Y, aRowNum, aColNum);
+      // CalcRowColFromXY returns incorrect result (0, 0) for aRowNum and aColNum when
+      // the mouse is over the currently selected (active) cell.
       if TblRegion = otrInMain then             // in the grid
         begin
           if (aRowNum = 0) and (aColNum = 0) and
